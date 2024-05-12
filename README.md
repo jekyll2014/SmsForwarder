@@ -8,16 +8,19 @@ Needs Telegram bot API-Key:
 and subscriber's ID:
  - can get it at https://t.me/userinfobot
 
-Made for those who have 2 or more SIM cards (differenc countries, different providers) and only need to get SMS messages on some of them (banc/security SMS codes).
+Made for those who have 2 or more SIM cards (different countries, different providers) and only need to get SMS messages on some of them (banc/security SMS codes).
 
 Can be controlled via Telegram menu/commands.
 
 P.S. Not all the commands are implemented for now.
 
-
+Planned features:
+1) SMS storage access
+2) Incoming call notification to Telegram
+3) PUSH notification forwarding
 
 Known bugs:
 
-1) software needs to be restarted after Telegram token or user ID list is changed.
+1) software needs to be restarted after the Telegram token or user ID list is changed.
 
-2) The permssion acces for the PHONE is not working properly. Please check/approve permissions manually in the app properties manually for the first time.
+2) The permssion access for the PHONE is not working properly. Please check/approve permissions manually in the app properties for the first time.
