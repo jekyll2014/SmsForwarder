@@ -13,3 +13,11 @@ Made for those who have 2 or more SIM cards (differenc countries, different prov
 Can be controlled via Telegram menu/commands.
 
 P.S. Not all the commands are implemented for now.
+
+
+
+Known bugs:
+
+1) software needs to be restarted after Telegram token or user ID list is changed.
+
+2) The permssion acces for the PHONE is not working properly. Please check/approve permissions manually in the app properties manually for the first time.
