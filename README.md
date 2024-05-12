@@ -3,6 +3,7 @@
 Software to forward incoming SMS messages to Telegram.
 Needs Telegram bot API-Key:
  - can be created/managed via official Telegram BotFather https://t.me/BotFather
+
 and subscriber's ID:
  - can get it at https://t.me/userinfobot
 
