@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -9,6 +10,8 @@ using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+
+using Message = Telegram.Bot.Types.Message;
 
 namespace SmsForwarder
 {
@@ -23,9 +26,9 @@ namespace SmsForwarder
         private const string SmsSendCommand = "/smssend";
         private const string SmsSendCommandDescription = "Send SMS";
         private const string SmsListCommand = "/smslist";
-        private const string SmsListCommandDescription = "Get SMS list";
-        private const string SmsGetCommand = "/smsget";
-        private const string SmsGetCommandDescription = "Get SMS";
+        private const string SmsListCommandDescription = "Get recent SMS list";
+        private const string CallListCommand = "/phonelog";
+        private const string CallListommandDescription = "Get call-log";
 
         private bool _disposedValue;
 
@@ -76,11 +79,11 @@ namespace SmsForwarder
                         Command = SmsListCommand.TrimStart('/'),
                         Description = SmsListCommandDescription
                     },
-                    new BotCommand()
+                    /*new BotCommand()
                     {
                         Command = SmsGetCommand.TrimStart('/'),
                         Description = SmsGetCommandDescription
-                    }
+                    }*/
                 }).Wait();
 
                 _botClient.StartReceiving(
@@ -144,6 +147,9 @@ namespace SmsForwarder
                 {
                     var smsAllowed = MainActivity.CheckSmsPermission().Result;
                     var phoneAllowed = MainActivity.CheckPhonePermission().Result;
+                    // battery status
+                    // GSM network status
+                    // 
                     await SendText(chatId, $"SMS allowed: {smsAllowed}\r\nPhone allowed: {phoneAllowed}", CancellationToken.None);
                 }
                 //send SMS message
@@ -165,10 +171,21 @@ namespace SmsForwarder
                     }
                 }
                 //get list of SMS
-                //get SMS
-                //get recent calls
-            });
+                else if (messageText.StartsWith(SmsListCommand, StringComparison.OrdinalIgnoreCase))
+                {
+                    var smsList = GetAllSms().OrderBy(n => n.Id).TakeLast(10);
+                    var sb = new StringBuilder();
+                    foreach (var sms in smsList)
+                    {
+                        sb.AppendLine(sms.ToString());
+                    }
 
+                    await SendText(chatId, sb.ToString(), CancellationToken.None);
+                }
+                //get recent calls
+                else if (messageText.StartsWith(CallListCommand, StringComparison.OrdinalIgnoreCase))
+                { }
+            });
         }
 
         private async Task HandlePollingErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken token)
@@ -213,6 +230,44 @@ namespace SmsForwarder
                 Console.WriteLine($"Telegram exception: {ex}");
                 return null;
             }
+        }
+
+        public static IEnumerable<StoredSmsContent> GetAllSms()
+        {
+            const string inbox = "content://sms/inbox";
+            var reqCols = new string[] { "_id", "thread_id", "address", "person", "date", "body", "type" };
+            var uri = Android.Net.Uri.Parse(inbox);
+            var cursor = Android.App.Application.Context.ContentResolver?.Query(uri, reqCols, null, null, null);
+            var items = new List<StoredSmsContent>();
+            if (cursor?.MoveToFirst() ?? false)
+            {
+                do
+                {
+                    var messageId = cursor.GetString(cursor.GetColumnIndex(reqCols[0]));
+                    var threadId = cursor.GetString(cursor.GetColumnIndex(reqCols[1]));
+                    var address = cursor.GetString(cursor.GetColumnIndex(reqCols[2]));
+                    var name = cursor.GetString(cursor.GetColumnIndex(reqCols[3]));
+                    var date = cursor.GetString(cursor.GetColumnIndex(reqCols[4]));
+                    var msg = cursor.GetString(cursor.GetColumnIndex(reqCols[5]));
+                    var type = cursor.GetString(cursor.GetColumnIndex(reqCols[6]));
+
+                    var dt = DateTime.UnixEpoch.AddMilliseconds(long.Parse(date ?? "0"));
+                    var item = new StoredSmsContent()
+                    {
+                        Id = long.Parse(messageId ?? "0"),
+                        ThreadId = long.Parse(threadId ?? "0"),
+                        Address = address ?? "",
+                        Person = name ?? "",
+                        Date = dt,
+                        Text = msg ?? "",
+                        Type = type == "1" ? "Received" : $"[{type}] Sent/Draft/..."
+                    };
+
+                    items.Add(item);
+                } while (cursor.MoveToNext());
+            }
+
+            return items;
         }
 
         protected virtual void Dispose(bool disposing)

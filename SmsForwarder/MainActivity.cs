@@ -20,7 +20,15 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Toolbar = AndroidX.AppCompat.Widget.Toolbar;
-
+[assembly: UsesPermission(Android.Manifest.Permission.Internet)]
+[assembly: UsesPermission(Android.Manifest.Permission.PersistentActivity)]
+[assembly: UsesPermission(Android.Manifest.Permission.ForegroundService)]
+[assembly: UsesPermission(Android.Manifest.Permission.PostNotifications)]
+[assembly: UsesPermission(Android.Manifest.Permission.ReadPhoneState)]
+[assembly: UsesPermission(Android.Manifest.Permission.ReadSms)]
+[assembly: UsesPermission(Android.Manifest.Permission.ReceiveSms)]
+[assembly: UsesPermission(Android.Manifest.Permission.RequestIgnoreBatteryOptimizations)]
+[assembly: UsesPermission(Android.Manifest.Permission.SendSms)]
 namespace SmsForwarder
 {
     [Activity(Label = "@string/app_name", Theme = "@style/AppTheme.NoActionBar", MainLauncher = true)]
@@ -71,20 +79,32 @@ namespace SmsForwarder
 
             _tvSmsContent = FindViewById<TextView>(Resource.Id.tvSMSContent);
 
+            RequestPermissions(new string[]
+            {
+                Android.Manifest.Permission.Internet,
+                Android.Manifest.Permission.PersistentActivity,
+                Android.Manifest.Permission.ForegroundService,
+                Android.Manifest.Permission.PostNotifications,
+                Android.Manifest.Permission.ReadPhoneState,
+                Android.Manifest.Permission.ReadSms,
+                Android.Manifest.Permission.ReceiveSms,
+                Android.Manifest.Permission.RequestIgnoreBatteryOptimizations,
+                Android.Manifest.Permission.SendSms,
+            }, 0);
+
             _smsPermissionCheckBox = FindViewById<CheckBox>(Resource.Id.checkBoxSmsPermission);
-            var status = RequestSmsPermission().Result;
+            var status = CheckSmsPermission().Result;
             if (_smsPermissionCheckBox != null)
                 _smsPermissionCheckBox.Checked = status == PermissionStatus.Granted;
 
             // ToDo: fix 2nd permission request hangs the program
             _phonePermissionCheckBox = FindViewById<CheckBox>(Resource.Id.checkBoxPhonePermission);
-            status = RequestPhonePermission().Result;
+            status = CheckPhonePermission().Result;
             if (_phonePermissionCheckBox != null)
                 _phonePermissionCheckBox.Checked = status == PermissionStatus.Granted;
 
             _instance = this;
             _telegram = new TelegramService(AppSettings.TelegramToken, AppSettings.AuthorisedUsers);
-
             _cts = new CancellationTokenSource();
 
             Task.Run(async () =>
@@ -94,7 +114,7 @@ namespace SmsForwarder
             });
 
             _intent = new Intent(this, typeof(SmsForwardingService));
-            StartService(_intent);
+            this.StartForegroundServiceCompat<SmsForwardingService>();
 
             /*var pushIntent = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
             StartActivity(pushIntent);*/
@@ -121,8 +141,9 @@ namespace SmsForwarder
         private static void FabOnClick(object sender, EventArgs eventArgs)
         {
             var view = (View)sender;
-            Snackbar.Make(view, "Replace with your own action", BaseTransientBottomBar.LengthLong)
-                .SetAction("Action", (View.IOnClickListener)null).Show();
+            Snackbar.Make(view, "Contact author at jekyll2006@gmail.com", BaseTransientBottomBar.LengthLong)
+                //.SetAction("Action", (View.IOnClickListener)null)
+                .Show();
         }
 
         public override void OnRequestPermissionsResult(int requestCode, string[] permissions, [GeneratedEnum] Android.Content.PM.Permission[] grantResults)
@@ -143,57 +164,11 @@ namespace SmsForwarder
             }
         }
 
-        private static async Task<PermissionStatus> RequestSmsPermission()
-        {
-            try
-            {
-                var status = await CheckSmsPermission();
-                if (status != PermissionStatus.Granted)
-                {
-                    if (await CrossPermissions.Current.ShouldShowRequestPermissionRationaleAsync(Permission.Sms))
-                    {
-                        //Gonna need that location
-                    }
-
-                    status = await CrossPermissions.Current.RequestPermissionAsync<SmsPermission>();
-                }
-
-                return status;
-            }
-            catch (Exception ex)
-            {
-                return PermissionStatus.Unknown;
-            }
-        }
-
         public static async Task<PermissionStatus> CheckPhonePermission()
         {
             try
             {
                 return await CrossPermissions.Current.CheckPermissionStatusAsync<PhonePermission>();
-            }
-            catch (Exception ex)
-            {
-                return PermissionStatus.Unknown;
-            }
-        }
-
-        private static async Task<PermissionStatus> RequestPhonePermission()
-        {
-            try
-            {
-                var status = await CheckPhonePermission();
-                if (status != PermissionStatus.Granted)
-                {
-                    if (await CrossPermissions.Current.ShouldShowRequestPermissionRationaleAsync(Permission.Phone))
-                    {
-                        //Gunna need that location
-                    }
-
-                    status = await CrossPermissions.Current.RequestPermissionAsync<PhonePermission>();
-                }
-
-                return status;
             }
             catch (Exception ex)
             {
@@ -240,6 +215,11 @@ namespace SmsForwarder
 
             try
             {
+                /*if (Android.OS.Build.VERSION.SdkInt >= BuildVersionCodes.M) {
+                    var smsManager = Context.getSystemService(SmsManager::class.java)
+                } else {
+                    SmsManager.getDefault()
+                }*/
                 SmsManager.Default?.SendTextMessage(address, null,
                     text, null, null);
             }
