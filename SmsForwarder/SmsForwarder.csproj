@@ -74,7 +74,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AppSettings.cs" />
+    <Compile Include="CallLogRecord.cs" />
     <Compile Include="FailureListener.cs" />
+    <Compile Include="GsmInfo.cs" />
     <Compile Include="MainActivity.cs" />
     <Compile Include="Resources\Resource.designer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -83,7 +85,7 @@
     <Compile Include="SMSBroadcastReceiver.cs" />
     <Compile Include="SmsContent.cs" />
     <Compile Include="SmsForwardingService.cs" />
-    <Compile Include="StoredSmsContent.cs" />
+    <Compile Include="StoredSmsRecord.cs" />
     <Compile Include="SuccessListener.cs" />
     <Compile Include="TelegramService.cs" />
   </ItemGroup>

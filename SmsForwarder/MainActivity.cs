@@ -19,12 +19,14 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Permission = Android.Content.PM.Permission;
 using Toolbar = AndroidX.AppCompat.Widget.Toolbar;
 [assembly: UsesPermission(Android.Manifest.Permission.Internet)]
 [assembly: UsesPermission(Android.Manifest.Permission.PersistentActivity)]
 [assembly: UsesPermission(Android.Manifest.Permission.ForegroundService)]
 [assembly: UsesPermission(Android.Manifest.Permission.PostNotifications)]
 [assembly: UsesPermission(Android.Manifest.Permission.ReadPhoneState)]
+[assembly: UsesPermission(Android.Manifest.Permission.ReadCallLog)]
 [assembly: UsesPermission(Android.Manifest.Permission.ReadSms)]
 [assembly: UsesPermission(Android.Manifest.Permission.ReceiveSms)]
 [assembly: UsesPermission(Android.Manifest.Permission.RequestIgnoreBatteryOptimizations)]
@@ -43,6 +45,7 @@ namespace SmsForwarder
         private TextView? _tvSmsContent;
         private CheckBox? _smsPermissionCheckBox;
         private CheckBox? _phonePermissionCheckBox;
+        private CheckBox? _callLogPermissionCheckBox;
 
         protected override void OnCreate(Bundle? savedInstanceState)
         {
@@ -64,6 +67,8 @@ namespace SmsForwarder
                 tokenText.AfterTextChanged += (sender, args) =>
                 {
                     AppSettings.TelegramToken = args.Editable?.ToString() ?? string.Empty;
+
+                    Toast.MakeText(this, "Please restart app to apply Telegram token", ToastLength.Long)?.Show();
                 };
             }
 
@@ -74,6 +79,9 @@ namespace SmsForwarder
                 usersText.AfterTextChanged += (sender, args) =>
                 {
                     AppSettings.AuthorisedUsersString = args.Editable?.ToString() ?? string.Empty;
+
+                    if (_telegram != null)
+                        _telegram.AuthorisedUsers = AppSettings.AuthorisedUsers;
                 };
             }
 
@@ -88,6 +96,7 @@ namespace SmsForwarder
                 Android.Manifest.Permission.ReadPhoneState,
                 Android.Manifest.Permission.ReadSms,
                 Android.Manifest.Permission.ReceiveSms,
+                Android.Manifest.Permission.ReadCallLog,
                 Android.Manifest.Permission.RequestIgnoreBatteryOptimizations,
                 Android.Manifest.Permission.SendSms,
             }, 0);
@@ -97,11 +106,15 @@ namespace SmsForwarder
             if (_smsPermissionCheckBox != null)
                 _smsPermissionCheckBox.Checked = status == PermissionStatus.Granted;
 
-            // ToDo: fix 2nd permission request hangs the program
             _phonePermissionCheckBox = FindViewById<CheckBox>(Resource.Id.checkBoxPhonePermission);
             status = CheckPhonePermission().Result;
             if (_phonePermissionCheckBox != null)
                 _phonePermissionCheckBox.Checked = status == PermissionStatus.Granted;
+
+            _callLogPermissionCheckBox = FindViewById<CheckBox>(Resource.Id.checkBoxCallLogPermission);
+            var s = CheckSelfPermission(Android.Manifest.Permission.ReadCallLog);
+            if (_callLogPermissionCheckBox != null)
+                _callLogPermissionCheckBox.Checked = s == Permission.Granted;
 
             _instance = this;
             _telegram = new TelegramService(AppSettings.TelegramToken, AppSettings.AuthorisedUsers);

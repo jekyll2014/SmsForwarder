@@ -60,6 +60,12 @@
                 android:layout_height="match_parent"
                 android:id="@+id/checkBoxPhonePermission"
                 android:enabled="false" />
+            <CheckBox
+	            android:text="Call log"
+	            android:layout_width="wrap_content"
+	            android:layout_height="match_parent"
+	            android:id="@+id/checkBoxCallLogPermission"
+	            android:enabled="false" />
         </LinearLayout>
 
         <TextView
