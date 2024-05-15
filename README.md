@@ -15,9 +15,8 @@ Can be controlled via the Telegram menu/commands.
 P.S. '/smssend' command is not properly implemented in the menu for now. can still be run by sending '/smssend <phone_number> <message_text>'
 
 Planned features:
-1) SMS storage access
-2) Incoming call notification to Telegram
-3) PUSH notification forwarding
+1) Incoming call notification to Telegram
+2) PUSH notification forwarding
 
 Known bugs:
 
