@@ -15,7 +15,7 @@ namespace SmsForwarder
             return $"{nameof(Name)}={Name}\r\n" +
                    $"{nameof(Phone)}={Phone}\r\n" +
                    $"{nameof(Date)}={Date}\r\n" +
-                   $"{nameof(Duration)}={Duration}\r\n" +
+                   $"{nameof(Duration)}={Duration} sec.\r\n" +
                    $"{nameof(Type)}={Type}\r\n" +
                    "====";
         }

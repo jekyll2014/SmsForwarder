@@ -1,19 +1,16 @@
-﻿using System;
+﻿using Android.App;
+using Android.Content;
+using Android.OS;
+using Android.Provider;
+using Android.Widget;
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Mime;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-
-using Android.App;
-using Android.Content;
-using Android.Locations;
-using Android.OS;
-using Android.Provider;
-
-using Javax.Security.Auth;
-
+using Android.Telephony;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
@@ -26,8 +23,11 @@ namespace SmsForwarder
 {
     public class TelegramService : IDisposable
     {
-        private readonly CancellationTokenSource? _cts;
-        private readonly TelegramBotClient? _botClient;
+        private CancellationTokenSource? _cts;
+        private TelegramBotClient? _botClient;
+
+        private string _token;
+
         public long[] AuthorisedUsers;
 
         private const string StatusCommand = "/status";
@@ -39,80 +39,20 @@ namespace SmsForwarder
         private const string CallListCommand = "/phonelog";
         private const string CallListommandDescription = "Get call-log";
 
+        private char[] _messageBounds = new char[] { '<', '>' };
+        private bool _sendingSms = false;
+
         private bool _disposedValue;
 
         public TelegramService(string token, long[] authorisedUsers)
         {
+            _token = token;
             AuthorisedUsers = authorisedUsers;
 
-            if (string.IsNullOrEmpty(token))
+            if (!string.IsNullOrEmpty(_token))
             {
-                Console.WriteLine("Telegram service not setup.");
-
-                return;
-            }
-
-            Console.WriteLine("Starting Telegram service...");
-            _cts = new CancellationTokenSource();
-            _botClient = new TelegramBotClient(token);
-            // StartReceiving does not block the caller thread. Receiving is done on the ThreadPool.
-            var receiverOptions = new ReceiverOptions()
-            {
-                AllowedUpdates = new UpdateType[] { UpdateType.Message, UpdateType.CallbackQuery }
-            };
-
-            try
-            {
-                if (!_botClient.TestApiAsync().Result)
-                {
-                    Console.WriteLine($"Telegram connection failed.");
-                    _botClient = null;
-
-                    return;
-                }
-
-                _botClient.SetMyCommandsAsync(new[]
-                {
-                    new BotCommand()
-                    {
-                        Command = StatusCommand.TrimStart('/'),
-                        Description = StatusCommandDescription
-                    },
-                    new BotCommand()
-                    {
-                        Command = SmsSendCommand.TrimStart('/'),
-                        Description = SmsSendCommandDescription
-                    },
-                    new BotCommand()
-                    {
-                        Command = SmsListCommand.TrimStart('/'),
-                        Description = SmsListCommandDescription
-                    },
-                    new BotCommand()
-                    {
-                        Command = CallListCommand.TrimStart('/'),
-                        Description = CallListommandDescription
-                    }
-                }).Wait();
-
-                _botClient.StartReceiving(
-                    updateHandler: HandleUpdateAsync,
-                    pollingErrorHandler: HandlePollingErrorAsync,
-                    receiverOptions: receiverOptions,
-                    cancellationToken: _cts.Token
-                );
-
-                var me = _botClient.GetMeAsync().Result;
-                Console.WriteLine($"...listening for @{me.Username} [{me.Id}]");
-                SendText(AuthorisedUsers, $"...listening for @{me.Username} [{me.Id}]");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"...connection failed: {ex}");
-                if (ex is ApiRequestException apiEx && apiEx.ErrorCode == 401)
-                {
-                    Console.WriteLine("Check your \"Telegram\": { \"Token\" } .");
-                }
+                MainActivity.ShowToast("Starting Telegram service...");
+                Connect();
             }
         }
 
@@ -143,11 +83,18 @@ namespace SmsForwarder
 
             if (!AuthorisedUsers.Contains(senderId))
             {
-                SendText(senderId, "You are not authorized to send messages", _cts?.Token ?? CancellationToken.None)
-                    .Wait(_cts?.Token ?? CancellationToken.None);
+                await SendText(senderId,
+                    "You are not authorized to send messages",
+                    _cts?.Token ?? CancellationToken.None);
             }
 
-            Console.WriteLine($"Received a '{messageText}' message from \"@{senderName}\"[{senderId}].");
+            MainActivity.ShowToast($"Received a '{messageText}' message from \"@{senderName}\"[{senderId}]");
+
+            if (_sendingSms)
+            {
+                messageText = $"{SmsSendCommand} {messageText}";
+                _sendingSms = false;
+            }
 
             await Task.Run(async () =>
             {
@@ -161,24 +108,34 @@ namespace SmsForwarder
                         var gsmSignal = GetCellphoneProvider();
                         var batteryLevel = GetBatteryLevel();
 
-                        await SendText(chatId, $"SMS allowed: {smsAllowed}\r\nPhone allowed: {phoneAllowed}\r\n{gsmSignal}\r\nBattery: {batteryLevel}%", CancellationToken.None);
+                        await SendText(chatId,
+                            $"SMS allowed: {smsAllowed}\r\nPhone allowed: {phoneAllowed}\r\n{gsmSignal}\r\nBattery: {batteryLevel}%",
+                            _cts?.Token ?? CancellationToken.None);
                     }
                     //send SMS message
                     else if (messageText.StartsWith(SmsSendCommand, StringComparison.OrdinalIgnoreCase))
                     {
+                        if (messageText.Length <= SmsSendCommand.Length + 4)
+                        {
+                            _sendingSms = true;
+                            await SendText(senderId, $"Please send me SMS address and text like: <phone_number> <text of the message>", _cts?.Token ?? CancellationToken.None);
+
+                            return;
+                        }
+
                         messageText = messageText.Substring(SmsSendCommand.Length + 1);
                         var address = messageText.Split(new[] { ' ', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
                             .FirstOrDefault() ?? string.Empty;
-
-                        if (MainActivity.SendSms(address, messageText.Substring(address.Length + 1)))
+                        address = address.Trim(_messageBounds);
+                        messageText = messageText.Substring(address.Length + 1);
+                        messageText = messageText.Trim(_messageBounds);
+                        if (SendSms(address, messageText))
                         {
-                            SendText(senderId, $"SMS sent to {address}", _cts?.Token ?? CancellationToken.None)
-                                .Wait(_cts?.Token ?? CancellationToken.None);
+                            await SendText(senderId, $"SMS sent to {address}", _cts?.Token ?? CancellationToken.None);
                         }
                         else
                         {
-                            SendText(senderId, $"SMS not sent to {address}", _cts?.Token ?? CancellationToken.None)
-                                .Wait(_cts?.Token ?? CancellationToken.None);
+                            await SendText(senderId, $"SMS not sent to {address}", _cts?.Token ?? CancellationToken.None);
                         }
                     }
                     //get list of SMS
@@ -191,7 +148,7 @@ namespace SmsForwarder
                             sb.AppendLine(sms.ToString());
                         }
 
-                        await SendText(chatId, sb.ToString(), CancellationToken.None);
+                        await SendText(chatId, sb.ToString(), _cts?.Token ?? CancellationToken.None);
                     }
                     //get recent calls
                     else if (messageText.StartsWith(CallListCommand, StringComparison.OrdinalIgnoreCase))
@@ -203,12 +160,12 @@ namespace SmsForwarder
                             sb.AppendLine(sms.ToString());
                         }
 
-                        await SendText(chatId, sb.ToString(), CancellationToken.None);
+                        await SendText(chatId, sb.ToString(), _cts?.Token ?? CancellationToken.None);
                     }
                 }
-                catch (Exception e)
+                catch (Exception ex)
                 {
-                    Console.WriteLine(e);
+                    MainActivity.ShowToast($"Exception durind processing command \"{messageText}\" from \"@{senderName}\"[{senderId}]: {ex}");
                 }
             });
         }
@@ -228,12 +185,110 @@ namespace SmsForwarder
             Console.WriteLine(errorMessage);
         }
 
-        public async Task<bool> SendText(IEnumerable<long> userIds, string text)
+        public async Task<bool> Connect()
+        {
+            _cts?.Dispose();
+
+            if (_botClient != null)
+            {
+                Disconnect();
+            }
+
+            _cts = new CancellationTokenSource();
+
+            _botClient = new TelegramBotClient(_token);
+            // StartReceiving does not block the caller thread. Receiving is done on the ThreadPool.
+            var receiverOptions = new ReceiverOptions()
+            {
+                AllowedUpdates = new UpdateType[] { UpdateType.Message, UpdateType.CallbackQuery }
+            };
+
+            try
+            {
+                if (!_botClient.TestApiAsync().Result)
+                {
+                    MainActivity.ShowToast("Telegram connection failed");
+                    _botClient = null;
+
+                    return false;
+                }
+
+                _botClient.SetMyCommandsAsync(new[]
+                {
+                    new BotCommand()
+                    {
+                        Command = StatusCommand.TrimStart('/'),
+                        Description = StatusCommandDescription
+                    },
+                    new BotCommand()
+                    {
+                        Command = SmsSendCommand.TrimStart('/'),
+                        Description = SmsSendCommandDescription
+                    },
+                    new BotCommand()
+                    {
+                        Command = SmsListCommand.TrimStart('/'),
+                        Description = SmsListCommandDescription
+                    },
+                    new BotCommand()
+                    {
+                        Command = CallListCommand.TrimStart('/'),
+                        Description = CallListommandDescription
+                    }
+                }).Wait();
+
+                _botClient.StartReceiving(
+                    updateHandler: HandleUpdateAsync,
+                    pollingErrorHandler: HandlePollingErrorAsync,
+                    receiverOptions: receiverOptions,
+                    cancellationToken: _cts.Token);
+
+                var me = _botClient.GetMeAsync().Result;
+                MainActivity.ShowToast("...listening for @{me.Username} [{me.Id}]");
+                await SendText(AuthorisedUsers,
+                    $"...listening for @{me.Username} [{me.Id}]",
+                    _cts.Token);
+            }
+            catch (Exception ex)
+            {
+                MainActivity.ShowToast($"...connection failed: {ex}");
+                if (ex is ApiRequestException apiEx && apiEx.ErrorCode == 401)
+                    MainActivity.ShowToast($"Check your telegram token: {_token}");
+                else
+                    MainActivity.ShowToast($"Exception: {ex}");
+
+                return false;
+            }
+
+            return true;
+        }
+
+        public void Disconnect()
+        {
+            _botClient?.CloseAsync();
+            _botClient = null;
+            _cts?.Cancel();
+            _cts?.Dispose();
+        }
+
+        public void SetToken(string value)
+        {
+            if (value == _token)
+                return;
+
+            _token = value;
+            Disconnect();
+
+            if (!string.IsNullOrEmpty(_token))
+                Connect();
+        }
+
+        public async Task<bool> SendText(IEnumerable<long> userIds, string text, CancellationToken cancellationToken)
         {
             var result = true;
             foreach (var user in userIds)
             {
-                if (await SendText(user, text, CancellationToken.None) == null)
+                if (await SendText(user, text, cancellationToken) == null)
                     result = false;
             }
 
@@ -247,7 +302,7 @@ namespace SmsForwarder
             if (_botClient == null)
                 return null;
 
-            Console.WriteLine($"Sending text to [{chatId}]: \"{text}\"");
+            //Console.WriteLine($"Sending text to [{chatId}]: \"{text}\"");
 
             try
             {
@@ -255,7 +310,8 @@ namespace SmsForwarder
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Telegram exception: {ex}");
+                MainActivity.ShowToast($"Telegram exception: {ex}");
+
                 return null;
             }
         }
@@ -280,17 +336,16 @@ namespace SmsForwarder
                 {
                     using (var battery = Application.Context.RegisterReceiver(null, filter))
                     {
-                        var level = battery.GetIntExtra(BatteryManager.ExtraLevel, -1);
-                        var scale = battery.GetIntExtra(BatteryManager.ExtraScale, -1);
+                        var level = battery?.GetIntExtra(BatteryManager.ExtraLevel, -1) ?? -1;
+                        var scale = battery?.GetIntExtra(BatteryManager.ExtraScale, -1) ?? -1;
 
                         return (int)Math.Floor(level * 100D / scale);
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                Console.WriteLine(
-                    "Unable to gather battery level, ensure you have android.permission.BATTERY_STATS set in AndroidManifest.");
+                //Console.WriteLine("Unable to gather battery level, ensure you have android.permission.BATTERY_STATS set in AndroidManifest.");
             }
 
             return -1;
@@ -385,6 +440,31 @@ namespace SmsForwarder
             return items;
         }
 
+        public static bool SendSms(string address, string text)
+        {
+            if (string.IsNullOrEmpty(address) || string.IsNullOrEmpty(text))
+                return false;
+
+            try
+            {
+                /*if (Android.OS.Build.VERSION.SdkInt >= BuildVersionCodes.M) {
+                    var smsManager = Context.getSystemService(SmsManager::class.java)
+                } else {
+                    SmsManager.getDefault()
+                }*/
+                SmsManager.Default?.SendTextMessage(address, null,
+                    text, null, null);
+
+                MainActivity.ShowToast("SMS sent");
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposedValue)
@@ -392,6 +472,7 @@ namespace SmsForwarder
                 if (disposing)
                 {
                     _botClient?.CloseAsync();
+                    _cts?.Cancel();
                     _cts?.Dispose();
                 }
 

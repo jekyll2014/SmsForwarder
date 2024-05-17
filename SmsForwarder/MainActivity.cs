@@ -16,6 +16,7 @@ using Plugin.Permissions.Abstractions;
 
 using System;
 using System.Collections.Concurrent;
+using System.Runtime.Remoting.Contexts;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -42,16 +43,21 @@ namespace SmsForwarder
         private TelegramService? _telegram;
         private static readonly ConcurrentQueue<SmsContent> SmsQueue = new ConcurrentQueue<SmsContent>();
 
-        private TextView? _tvSmsContent;
-        private CheckBox? _smsPermissionCheckBox;
-        private CheckBox? _phonePermissionCheckBox;
-        private CheckBox? _callLogPermissionCheckBox;
+        private static TextView? _tvSmsContent;
+        private static CheckBox? _smsPermissionCheckBox;
+        private static CheckBox? _phonePermissionCheckBox;
+        private static CheckBox? _callLogPermissionCheckBox;
+        private static CheckBox? _lastSmsCheckBox;
+
 
         protected override void OnCreate(Bundle? savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
             Xamarin.Essentials.Platform.Init(this, savedInstanceState);
             SetContentView(Resource.Layout.activity_main);
+            _instance = this;
+
+            _telegram = new TelegramService(AppSettings.TelegramToken, AppSettings.AuthorisedUsers);
 
             var toolbar = FindViewById<Toolbar>(Resource.Id.toolbar);
             SetSupportActionBar(toolbar);
@@ -64,11 +70,13 @@ namespace SmsForwarder
             if (tokenText != null)
             {
                 tokenText.Text = AppSettings.TelegramToken;
-                tokenText.AfterTextChanged += (sender, args) =>
+                tokenText.FocusChange += (sender, args) =>
                 {
-                    AppSettings.TelegramToken = args.Editable?.ToString() ?? string.Empty;
-
-                    Toast.MakeText(this, "Please restart app to apply Telegram token", ToastLength.Long)?.Show();
+                    if (!args.HasFocus && AppSettings.TelegramToken != tokenText.Text)
+                    {
+                        AppSettings.TelegramToken = tokenText.Text;
+                        _telegram?.SetToken(AppSettings.TelegramToken);
+                    }
                 };
             }
 
@@ -76,12 +84,16 @@ namespace SmsForwarder
             if (usersText != null)
             {
                 usersText.Text = AppSettings.AuthorisedUsersString;
-                usersText.AfterTextChanged += (sender, args) =>
+                usersText.FocusChange += (sender, args) =>
                 {
-                    AppSettings.AuthorisedUsersString = args.Editable?.ToString() ?? string.Empty;
+                    if (!args.HasFocus && AppSettings.AuthorisedUsersString != usersText.Text)
+                    {
+                        AppSettings.AuthorisedUsersString = usersText.Text;
+                        usersText.Text = AppSettings.AuthorisedUsersString;
 
-                    if (_telegram != null)
-                        _telegram.AuthorisedUsers = AppSettings.AuthorisedUsers;
+                        if (_telegram != null)
+                            _telegram.AuthorisedUsers = AppSettings.AuthorisedUsers;
+                    }
                 };
             }
 
@@ -116,8 +128,8 @@ namespace SmsForwarder
             if (_callLogPermissionCheckBox != null)
                 _callLogPermissionCheckBox.Checked = s == Permission.Granted;
 
-            _instance = this;
-            _telegram = new TelegramService(AppSettings.TelegramToken, AppSettings.AuthorisedUsers);
+            _lastSmsCheckBox = FindViewById<CheckBox>(Resource.Id.checkBoxLastSms);
+
             _cts = new CancellationTokenSource();
 
             Task.Run(async () =>
@@ -192,9 +204,10 @@ namespace SmsForwarder
         public static void EnqueueSms(SmsContent smsContent)
         {
             SmsQueue.Enqueue(smsContent);
-            if (_instance?._tvSmsContent != null)
+
+            if (_lastSmsCheckBox?.Checked == true && _tvSmsContent != null)
             {
-                _instance._tvSmsContent.Text +=
+                _tvSmsContent.Text =
                     $"SMS received from [{smsContent.Sender}]:\r\n{smsContent.Message}\r\n\r\n";
             }
         }
@@ -208,11 +221,11 @@ namespace SmsForwarder
                     try
                     {
                         var messageContent = $"SMS from [{sms.Sender}]: {sms.Message}";
-                        _telegram?.SendText(AppSettings.AuthorisedUsers, messageContent);
+                        _telegram?.SendText(AppSettings.AuthorisedUsers, messageContent, _cts?.Token ?? CancellationToken.None);
                     }
-                    catch (Exception e)
+                    catch (Exception ex)
                     {
-                        Console.WriteLine(e);
+                        Console.WriteLine(ex);
                         throw;
                     }
                 }
@@ -221,30 +234,19 @@ namespace SmsForwarder
             }
         }
 
-        public static bool SendSms(string address, string text)
+        public static void ShowToast(string text)
         {
-            if (string.IsNullOrEmpty(address) || string.IsNullOrEmpty(text))
-                return false;
-
             try
             {
-                /*if (Android.OS.Build.VERSION.SdkInt >= BuildVersionCodes.M) {
-                    var smsManager = Context.getSystemService(SmsManager::class.java)
-                } else {
-                    SmsManager.getDefault()
-                }*/
-                SmsManager.Default?.SendTextMessage(address, null,
-                    text, null, null);
+                _instance?.RunOnUiThread(() =>
+                {
+                    Toast.MakeText(Android.App.Application.Context, text, ToastLength.Long)?.Show();
+                });
+
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                return false;
             }
-
-            if (_instance?._tvSmsContent != null)
-                _instance._tvSmsContent.Text += $"SMS sent to [{address}]:\r\n{text}\r\n\r\n";
-
-            return true;
         }
 
         protected override void OnDestroy()
