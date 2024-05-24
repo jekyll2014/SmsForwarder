@@ -2,7 +2,7 @@
 using Android.Content;
 using Android.OS;
 using Android.Provider;
-using Android.Widget;
+using Android.Telephony;
 
 using System;
 using System.Collections.Generic;
@@ -10,7 +10,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Android.Telephony;
+
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
@@ -51,7 +51,7 @@ namespace SmsForwarder
 
             if (!string.IsNullOrEmpty(_token))
             {
-                MainActivity.ShowToast("Starting Telegram service...");
+                MainActivity.ShowToast($"Starting Telegram service...");
                 Connect();
             }
         }
@@ -207,7 +207,7 @@ namespace SmsForwarder
             {
                 if (!_botClient.TestApiAsync().Result)
                 {
-                    MainActivity.ShowToast("Telegram connection failed");
+                    MainActivity.ShowToast($"Telegram connection failed");
                     _botClient = null;
 
                     return false;
@@ -244,7 +244,7 @@ namespace SmsForwarder
                     cancellationToken: _cts.Token);
 
                 var me = _botClient.GetMeAsync().Result;
-                MainActivity.ShowToast("...listening for @{me.Username} [{me.Id}]");
+                MainActivity.ShowToast($"...listening for @{me.Username} [{me.Id}]");
                 await SendText(AuthorisedUsers,
                     $"...listening for @{me.Username} [{me.Id}]",
                     _cts.Token);
@@ -455,7 +455,7 @@ namespace SmsForwarder
                 SmsManager.Default?.SendTextMessage(address, null,
                     text, null, null);
 
-                MainActivity.ShowToast("SMS sent");
+                MainActivity.ShowToast($"SMS sent");
             }
             catch (Exception ex)
             {

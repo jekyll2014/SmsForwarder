@@ -16,6 +16,7 @@ namespace SmsForwarder
 
 
         private const string AuthorisedUsersSettingKey = "AuthorisedUsers";
+
         public static long[] AuthorisedUsers
         {
             get
@@ -38,6 +39,7 @@ namespace SmsForwarder
                 CrossSettings.Current.AddOrUpdateValue(AuthorisedUsersSettingKey, settingValue);
             }
         }
+
         public static string AuthorisedUsersString
         {
             get => CrossSettings.Current.GetValueOrDefault(AuthorisedUsersSettingKey, string.Empty);
@@ -52,8 +54,35 @@ namespace SmsForwarder
                 }
 
                 var settingValue = users.Aggregate(string.Empty, (current, i) => current + $"{i};");
-
                 CrossSettings.Current.AddOrUpdateValue(AuthorisedUsersSettingKey, settingValue);
+            }
+        }
+
+
+        private const string IgnoredPhonesSettingKey = "IgnoredPhones";
+
+        public static string[] IgnoredPhones
+        {
+            get
+            {
+                return CrossSettings.Current.GetValueOrDefault(IgnoredPhonesSettingKey, string.Empty)
+                    .Split(';');
+            }
+            set
+            {
+                var settingValue = value.Aggregate(string.Empty, (current, i) => current + $"{i.Trim()};");
+                CrossSettings.Current.AddOrUpdateValue(IgnoredPhonesSettingKey, settingValue);
+            }
+        }
+
+        public static string IgnoredPhonesString
+        {
+            get => CrossSettings.Current.GetValueOrDefault(IgnoredPhonesSettingKey, string.Empty);
+            set
+            {
+                var phoneStrings = value.Split(';');
+                var settingValue = phoneStrings.Aggregate(string.Empty, (current, i) => current + $"{i.Trim()};");
+                CrossSettings.Current.AddOrUpdateValue(IgnoredPhonesSettingKey, settingValue);
             }
         }
     }

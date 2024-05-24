@@ -2,7 +2,6 @@
 using Android.Content;
 using Android.OS;
 using Android.Runtime;
-using Android.Telephony;
 using Android.Views;
 using Android.Widget;
 
@@ -16,7 +15,7 @@ using Plugin.Permissions.Abstractions;
 
 using System;
 using System.Collections.Concurrent;
-using System.Runtime.Remoting.Contexts;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -28,6 +27,7 @@ using Toolbar = AndroidX.AppCompat.Widget.Toolbar;
 [assembly: UsesPermission(Android.Manifest.Permission.PostNotifications)]
 [assembly: UsesPermission(Android.Manifest.Permission.ReadPhoneState)]
 [assembly: UsesPermission(Android.Manifest.Permission.ReadCallLog)]
+[assembly: UsesPermission(Android.Manifest.Permission.ReceiveBootCompleted)]
 [assembly: UsesPermission(Android.Manifest.Permission.ReadSms)]
 [assembly: UsesPermission(Android.Manifest.Permission.ReceiveSms)]
 [assembly: UsesPermission(Android.Manifest.Permission.RequestIgnoreBatteryOptimizations)]
@@ -37,11 +37,12 @@ namespace SmsForwarder
     [Activity(Label = "@string/app_name", Theme = "@style/AppTheme.NoActionBar", MainLauncher = true)]
     public class MainActivity : AppCompatActivity
     {
-        private static MainActivity? _instance;
+        private const int SmsExpiryHours = 24;
+        internal static MainActivity? _instance;
         private Intent? _intent;
         private CancellationTokenSource _cts = new CancellationTokenSource();
-        private TelegramService? _telegram;
-        private static readonly ConcurrentQueue<SmsContent> SmsQueue = new ConcurrentQueue<SmsContent>();
+        internal static TelegramService? _telegram;
+        private static readonly ConcurrentQueue<QueuedSms> SmsQueue = new ConcurrentQueue<QueuedSms>();
 
         private static TextView? _tvSmsContent;
         private static CheckBox? _smsPermissionCheckBox;
@@ -49,13 +50,15 @@ namespace SmsForwarder
         private static CheckBox? _callLogPermissionCheckBox;
         private static CheckBox? _lastSmsCheckBox;
 
-
         protected override void OnCreate(Bundle? savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
             Xamarin.Essentials.Platform.Init(this, savedInstanceState);
             SetContentView(Resource.Layout.activity_main);
             _instance = this;
+
+            var bootReceiver = new BootBroadcastReceiver();
+            RegisterReceiver(bootReceiver, new IntentFilter(Intent.ActionBootCompleted));
 
             _telegram = new TelegramService(AppSettings.TelegramToken, AppSettings.AuthorisedUsers);
 
@@ -97,6 +100,20 @@ namespace SmsForwarder
                 };
             }
 
+            var phonesText = FindViewById<EditText>(Resource.Id.editTextPhones);
+            if (phonesText != null)
+            {
+                phonesText.Text = AppSettings.IgnoredPhonesString;
+                phonesText.FocusChange += (sender, args) =>
+                {
+                    if (!args.HasFocus && AppSettings.IgnoredPhonesString != phonesText.Text)
+                    {
+                        AppSettings.IgnoredPhonesString = phonesText.Text;
+                        phonesText.Text = AppSettings.IgnoredPhonesString;
+                    }
+                };
+            }
+
             _tvSmsContent = FindViewById<TextView>(Resource.Id.tvSMSContent);
 
             RequestPermissions(new string[]
@@ -108,6 +125,7 @@ namespace SmsForwarder
                 Android.Manifest.Permission.ReadPhoneState,
                 Android.Manifest.Permission.ReadSms,
                 Android.Manifest.Permission.ReceiveSms,
+                Android.Manifest.Permission.ReceiveBootCompleted,
                 Android.Manifest.Permission.ReadCallLog,
                 Android.Manifest.Permission.RequestIgnoreBatteryOptimizations,
                 Android.Manifest.Permission.SendSms,
@@ -203,7 +221,13 @@ namespace SmsForwarder
 
         public static void EnqueueSms(SmsContent smsContent)
         {
-            SmsQueue.Enqueue(smsContent);
+            if (AppSettings.IgnoredPhones.Contains(smsContent.Sender))
+                return;
+
+            foreach (var user in AppSettings.AuthorisedUsers)
+            {
+                SmsQueue.Enqueue(new QueuedSms(smsContent, user));
+            }
 
             if (_lastSmsCheckBox?.Checked == true && _tvSmsContent != null)
             {
@@ -220,8 +244,14 @@ namespace SmsForwarder
                 {
                     try
                     {
-                        var messageContent = $"SMS from [{sms.Sender}]: {sms.Message}";
-                        _telegram?.SendText(AppSettings.AuthorisedUsers, messageContent, _cts?.Token ?? CancellationToken.None);
+                        var messageContent = $"SMS from [{sms.Content.Sender}]: {sms.Content.Message}";
+                        var sendTask = _telegram?.SendText(sms.UserId, messageContent,
+                            _cts?.Token ?? CancellationToken.None);
+                        if (sendTask?.Result == null)
+                        {
+                            if (DateTime.Now.Subtract(sms.CreatedOn).TotalHours < SmsExpiryHours)
+                                SmsQueue.Enqueue(sms);
+                        }
                     }
                     catch (Exception ex)
                     {

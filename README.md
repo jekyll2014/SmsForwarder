@@ -13,14 +13,14 @@ and subscriber's ID(s):
 Can be controlled via the Telegram menu/commands.
 
 Features:
+- restarted automatically on device boot
 - deliver your SMS to everyone  mentioned in the access list securely (as far as Telegram is secure)
+- ignore list for the phones you don't want to be forwarded
 - works as a background service and shall not be closed by Android system.
 - read SMS inbox (last 10 by default)
 - send SMS remotely
 - read call log
 - check phone status (battery level,network stats)
-
-P.S. '/smssend' command is not properly implemented in the menu for now. can still be run by sending '/smssend <phone_number> <message_text>'
 
 Planned features:
 1) Incoming call notification to Telegram

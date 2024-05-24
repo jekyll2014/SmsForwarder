@@ -5,10 +5,10 @@ using Android.Provider;
 namespace SmsForwarder
 {
     [BroadcastReceiver(Enabled = true, Exported = true)]
-    [IntentFilter(new[] { "android.provider.Telephony.SMS_RECEIVED" })]
+    [IntentFilter(new[] { Telephony.Sms.Intents.SmsReceivedAction })]
     public class SmsBroadcastReceiver : BroadcastReceiver
     {
-        private const string IntentAction = "android.provider.Telephony.SMS_RECEIVED";
+        private const string IntentAction = Telephony.Sms.Intents.SmsReceivedAction;
 
         public override void OnReceive(Context? context, Intent? intent)
         {
