@@ -130,11 +130,19 @@
 	        android:id="@+id/editTextPhones" />
 
         <CheckBox
+	        android:text="Restart on boot"
+	        android:layout_width="wrap_content"
+	        android:layout_height="wrap_content"
+	        android:id="@+id/checkBoxRestartOnBoot"
+            android:checked="false"
+	        android:enabled="true" />
+
+        <CheckBox
 	        android:text="Last SMS content"
 	        android:layout_width="wrap_content"
 	        android:layout_height="wrap_content"
 	        android:id="@+id/checkBoxLastSms"
-            android:checked="false"
+	        android:checked="false"
 	        android:enabled="true" />
 
         <ScrollView

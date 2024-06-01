@@ -21,6 +21,7 @@ using System.Threading.Tasks;
 
 using Permission = Android.Content.PM.Permission;
 using Toolbar = AndroidX.AppCompat.Widget.Toolbar;
+
 [assembly: UsesPermission(Android.Manifest.Permission.Internet)]
 [assembly: UsesPermission(Android.Manifest.Permission.PersistentActivity)]
 [assembly: UsesPermission(Android.Manifest.Permission.ForegroundService)]
@@ -38,16 +39,18 @@ namespace SmsForwarder
     public class MainActivity : AppCompatActivity
     {
         private const int SmsExpiryHours = 24;
-        internal static MainActivity? _instance;
+        private static MainActivity? _instance;
         private Intent? _intent;
         private CancellationTokenSource _cts = new CancellationTokenSource();
-        internal static TelegramService? _telegram;
+        private static TelegramService? _telegram;
         private static readonly ConcurrentQueue<QueuedSms> SmsQueue = new ConcurrentQueue<QueuedSms>();
+        private static BootBroadcastReceiver _bootReceiver = new BootBroadcastReceiver();
 
         private static TextView? _tvSmsContent;
         private static CheckBox? _smsPermissionCheckBox;
         private static CheckBox? _phonePermissionCheckBox;
         private static CheckBox? _callLogPermissionCheckBox;
+        private static CheckBox? _restartOnBootCheckBox;
         private static CheckBox? _lastSmsCheckBox;
 
         protected override void OnCreate(Bundle? savedInstanceState)
@@ -57,8 +60,32 @@ namespace SmsForwarder
             SetContentView(Resource.Layout.activity_main);
             _instance = this;
 
-            var bootReceiver = new BootBroadcastReceiver();
-            RegisterReceiver(bootReceiver, new IntentFilter(Intent.ActionBootCompleted));
+            _bootReceiver = new BootBroadcastReceiver();
+            if (AppSettings.RestartOnBoot)
+            {
+                try
+                {
+                    var result = RegisterReceiver(_bootReceiver, new IntentFilter(Intent.ActionBootCompleted));
+                }
+                catch (Exception ex)
+                {
+                    ShowToast("Can't register restart on boot");
+                    AppSettings.RestartOnBoot = false;
+                }
+            }
+            else
+            {
+                try
+                {
+                    UnregisterReceiver(_bootReceiver);
+                }
+                catch (Exception ex)
+                {
+                    ShowToast("Can't unregister restart on boot");
+                }
+
+                AppSettings.RestartOnBoot = false;
+            }
 
             _telegram = new TelegramService(AppSettings.TelegramToken, AppSettings.AuthorisedUsers);
 
@@ -148,6 +175,13 @@ namespace SmsForwarder
 
             _lastSmsCheckBox = FindViewById<CheckBox>(Resource.Id.checkBoxLastSms);
 
+            _restartOnBootCheckBox = FindViewById<CheckBox>(Resource.Id.checkBoxRestartOnBoot);
+            if (_restartOnBootCheckBox != null)
+            {
+                _restartOnBootCheckBox.Checked = AppSettings.RestartOnBoot;
+                _restartOnBootCheckBox.CheckedChange += RestartOnBootCheckBox_CheckedChange;
+            }
+
             _cts = new CancellationTokenSource();
 
             Task.Run(async () =>
@@ -161,6 +195,38 @@ namespace SmsForwarder
 
             /*var pushIntent = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
             StartActivity(pushIntent);*/
+        }
+
+        private void RestartOnBootCheckBox_CheckedChange(object sender, CompoundButton.CheckedChangeEventArgs e)
+        {
+            if (e.IsChecked)
+            {
+                try
+                {
+                    var result = RegisterReceiver(_bootReceiver, new IntentFilter(Intent.ActionBootCompleted));
+                    AppSettings.RestartOnBoot = true;
+                }
+                catch (Exception ex)
+                {
+                    ShowToast("Can't register restart on boot");
+                    AppSettings.RestartOnBoot = false;
+                }
+            }
+            else
+            {
+                try
+                {
+                    AppSettings.RestartOnBoot = false;
+                    UnregisterReceiver(_bootReceiver);
+                }
+                catch (Exception ex)
+                {
+                    ShowToast("Can't unregister restart on boot");
+                }
+            }
+
+            if (_restartOnBootCheckBox != null)
+                _restartOnBootCheckBox.Checked = AppSettings.RestartOnBoot;
         }
 
         public override bool OnCreateOptionsMenu(IMenu? menu)

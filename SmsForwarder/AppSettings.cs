@@ -14,9 +14,7 @@ namespace SmsForwarder
             set => CrossSettings.Current.AddOrUpdateValue(TelegramTokenSettingKey, value);
         }
 
-
         private const string AuthorisedUsersSettingKey = "AuthorisedUsers";
-
         public static long[] AuthorisedUsers
         {
             get
@@ -39,7 +37,6 @@ namespace SmsForwarder
                 CrossSettings.Current.AddOrUpdateValue(AuthorisedUsersSettingKey, settingValue);
             }
         }
-
         public static string AuthorisedUsersString
         {
             get => CrossSettings.Current.GetValueOrDefault(AuthorisedUsersSettingKey, string.Empty);
@@ -58,9 +55,7 @@ namespace SmsForwarder
             }
         }
 
-
         private const string IgnoredPhonesSettingKey = "IgnoredPhones";
-
         public static string[] IgnoredPhones
         {
             get
@@ -74,7 +69,6 @@ namespace SmsForwarder
                 CrossSettings.Current.AddOrUpdateValue(IgnoredPhonesSettingKey, settingValue);
             }
         }
-
         public static string IgnoredPhonesString
         {
             get => CrossSettings.Current.GetValueOrDefault(IgnoredPhonesSettingKey, string.Empty);
@@ -84,6 +78,20 @@ namespace SmsForwarder
                 var settingValue = phoneStrings.Aggregate(string.Empty, (current, i) => current + $"{i.Trim()};");
                 CrossSettings.Current.AddOrUpdateValue(IgnoredPhonesSettingKey, settingValue);
             }
+        }
+
+        public static string RestartOnBootSettingKey = "RestartOnBoot";
+        public static bool RestartOnBoot
+        {
+            get
+            {
+                var value = CrossSettings.Current.GetValueOrDefault(RestartOnBootSettingKey, string.Empty);
+                if (bool.TryParse(value, out var result))
+                    return result;
+
+                return false;
+            }
+            set => CrossSettings.Current.AddOrUpdateValue(RestartOnBootSettingKey, value.ToString());
         }
     }
 }

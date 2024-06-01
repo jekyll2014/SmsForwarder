@@ -11,7 +11,7 @@ namespace SmsForwarder
 
         public override void OnReceive(Context? context, Intent? intent)
         {
-            if (intent?.Action != IntentAction)
+            if (intent?.Action != IntentAction || !AppSettings.RestartOnBoot)
                 return;
 
             var newIntent = new Intent(context, typeof(MainActivity));
