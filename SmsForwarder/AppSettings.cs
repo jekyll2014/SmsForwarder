@@ -1,7 +1,7 @@
-﻿using Plugin.Settings;
-
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
+
+using Xamarin.Essentials;
 
 namespace SmsForwarder
 {
@@ -10,8 +10,8 @@ namespace SmsForwarder
         private const string TelegramTokenSettingKey = "TelegramToken";
         public static string TelegramToken
         {
-            get => CrossSettings.Current.GetValueOrDefault(TelegramTokenSettingKey, string.Empty);
-            set => CrossSettings.Current.AddOrUpdateValue(TelegramTokenSettingKey, value);
+            get => Preferences.Get(TelegramTokenSettingKey, string.Empty);
+            set => Preferences.Set(TelegramTokenSettingKey, value);
         }
 
         private const string AuthorisedUsersSettingKey = "AuthorisedUsers";
@@ -19,7 +19,7 @@ namespace SmsForwarder
         {
             get
             {
-                var users = CrossSettings.Current.GetValueOrDefault(AuthorisedUsersSettingKey, string.Empty)
+                var users = Preferences.Get(AuthorisedUsersSettingKey, string.Empty)
                     .Split(';');
 
                 var result = new List<long>();
@@ -34,12 +34,12 @@ namespace SmsForwarder
             set
             {
                 var settingValue = value.Aggregate(string.Empty, (current, i) => current + $"{i};");
-                CrossSettings.Current.AddOrUpdateValue(AuthorisedUsersSettingKey, settingValue);
+                Preferences.Set(AuthorisedUsersSettingKey, settingValue);
             }
         }
         public static string AuthorisedUsersString
         {
-            get => CrossSettings.Current.GetValueOrDefault(AuthorisedUsersSettingKey, string.Empty);
+            get => Preferences.Get(AuthorisedUsersSettingKey, string.Empty);
             set
             {
                 var userStrings = value.Split(';');
@@ -51,7 +51,7 @@ namespace SmsForwarder
                 }
 
                 var settingValue = users.Aggregate(string.Empty, (current, i) => current + $"{i};");
-                CrossSettings.Current.AddOrUpdateValue(AuthorisedUsersSettingKey, settingValue);
+                Preferences.Set(AuthorisedUsersSettingKey, settingValue);
             }
         }
 
@@ -60,23 +60,23 @@ namespace SmsForwarder
         {
             get
             {
-                return CrossSettings.Current.GetValueOrDefault(IgnoredPhonesSettingKey, string.Empty)
+                return Preferences.Get(IgnoredPhonesSettingKey, string.Empty)
                     .Split(';');
             }
             set
             {
                 var settingValue = value.Aggregate(string.Empty, (current, i) => current + $"{i.Trim()};");
-                CrossSettings.Current.AddOrUpdateValue(IgnoredPhonesSettingKey, settingValue);
+                Preferences.Set(IgnoredPhonesSettingKey, settingValue);
             }
         }
         public static string IgnoredPhonesString
         {
-            get => CrossSettings.Current.GetValueOrDefault(IgnoredPhonesSettingKey, string.Empty);
+            get => Preferences.Get(IgnoredPhonesSettingKey, string.Empty);
             set
             {
                 var phoneStrings = value.Split(';');
                 var settingValue = phoneStrings.Aggregate(string.Empty, (current, i) => current + $"{i.Trim()};");
-                CrossSettings.Current.AddOrUpdateValue(IgnoredPhonesSettingKey, settingValue);
+                Preferences.Set(IgnoredPhonesSettingKey, settingValue);
             }
         }
 
@@ -85,13 +85,13 @@ namespace SmsForwarder
         {
             get
             {
-                var value = CrossSettings.Current.GetValueOrDefault(RestartOnBootSettingKey, string.Empty);
+                var value = Preferences.Get(RestartOnBootSettingKey, string.Empty);
                 if (bool.TryParse(value, out var result))
                     return result;
 
                 return false;
             }
-            set => CrossSettings.Current.AddOrUpdateValue(RestartOnBootSettingKey, value.ToString());
+            set => Preferences.Set(RestartOnBootSettingKey, value.ToString());
         }
     }
 }

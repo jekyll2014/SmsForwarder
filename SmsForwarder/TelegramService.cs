@@ -103,13 +103,17 @@ namespace SmsForwarder
                     //return status of the program
                     if (messageText.StartsWith(StatusCommand, StringComparison.OrdinalIgnoreCase))
                     {
-                        var smsAllowed = MainActivity.CheckSmsPermission().Result;
-                        var phoneAllowed = MainActivity.CheckPhonePermission().Result;
+                        //var smsAllowed = MainActivity.CheckSmsPermission();
+                        //var phoneAllowed = MainActivity.CheckPhonePermission();
                         var gsmSignal = GetCellphoneProvider();
                         var batteryLevel = GetBatteryLevel();
 
                         await SendText(chatId,
-                            $"SMS allowed: {smsAllowed}\r\nPhone allowed: {phoneAllowed}\r\n{gsmSignal}\r\nBattery: {batteryLevel}%",
+                            //$"SMS allowed: {smsAllowed}\r\n" +
+                            //$"Phone allowed: {phoneAllowed}\r\n" +
+                            $"GSM provider: {gsmSignal.CarrierName}\r\n" +
+                            $"GSM signal: {gsmSignal.SignalStrength}\r\n" +
+                            $"Battery: {batteryLevel}%",
                             _cts?.Token ?? CancellationToken.None);
                     }
                     //send SMS message

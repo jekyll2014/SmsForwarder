@@ -10,9 +10,6 @@ using AndroidX.AppCompat.App;
 using Google.Android.Material.FloatingActionButton;
 using Google.Android.Material.Snackbar;
 
-using Plugin.Permissions;
-using Plugin.Permissions.Abstractions;
-
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
@@ -159,19 +156,25 @@ namespace SmsForwarder
             }, 0);
 
             _smsPermissionCheckBox = FindViewById<CheckBox>(Resource.Id.checkBoxSmsPermission);
-            var status = CheckSmsPermission().Result;
             if (_smsPermissionCheckBox != null)
-                _smsPermissionCheckBox.Checked = status == PermissionStatus.Granted;
+            {
+                var status = CheckSmsPermission();
+                _smsPermissionCheckBox.Checked = status == Permission.Granted;
+            }
 
             _phonePermissionCheckBox = FindViewById<CheckBox>(Resource.Id.checkBoxPhonePermission);
-            status = CheckPhonePermission().Result;
             if (_phonePermissionCheckBox != null)
-                _phonePermissionCheckBox.Checked = status == PermissionStatus.Granted;
+            {
+                var status = CheckSelfPermission(Android.Manifest.Permission.ReadPhoneState);
+                _phonePermissionCheckBox.Checked = status == Permission.Granted;
+            }
 
             _callLogPermissionCheckBox = FindViewById<CheckBox>(Resource.Id.checkBoxCallLogPermission);
-            var s = CheckSelfPermission(Android.Manifest.Permission.ReadCallLog);
             if (_callLogPermissionCheckBox != null)
-                _callLogPermissionCheckBox.Checked = s == Permission.Granted;
+            {
+                var status = CheckSelfPermission(Android.Manifest.Permission.ReadCallLog);
+                _callLogPermissionCheckBox.Checked = status == Permission.Granted;
+            }
 
             _lastSmsCheckBox = FindViewById<CheckBox>(Resource.Id.checkBoxLastSms);
 
@@ -270,28 +273,20 @@ namespace SmsForwarder
             base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
         }
 
-        public static async Task<PermissionStatus> CheckSmsPermission()
+        public Permission CheckSmsPermission()
         {
-            try
-            {
-                return await CrossPermissions.Current.CheckPermissionStatusAsync<SmsPermission>();
-            }
-            catch (Exception ex)
-            {
-                return PermissionStatus.Unknown;
-            }
+            var s1 = CheckSelfPermission(Android.Manifest.Permission.ReadSms);
+            var s2 = CheckSelfPermission(Android.Manifest.Permission.ReceiveSms);
+            var s3 = CheckSelfPermission(Android.Manifest.Permission.SendSms);
+
+            return (s1 == Permission.Granted
+                    && s2 == Permission.Granted
+                    && s3 == Permission.Granted) ? Permission.Granted : Permission.Denied;
         }
 
-        public static async Task<PermissionStatus> CheckPhonePermission()
+        public Permission CheckPhonePermission()
         {
-            try
-            {
-                return await CrossPermissions.Current.CheckPermissionStatusAsync<PhonePermission>();
-            }
-            catch (Exception ex)
-            {
-                return PermissionStatus.Unknown;
-            }
+            return CheckSelfPermission(Android.Manifest.Permission.ReadPhoneState);
         }
 
         public static void EnqueueSms(SmsContent smsContent)
@@ -352,16 +347,6 @@ namespace SmsForwarder
             catch (Exception ex)
             {
             }
-        }
-
-        protected override void OnDestroy()
-        {
-            /*SmsQueue.Clear();
-            StopService(_intent);
-            _cts?.Cancel();
-            _cts?.Dispose();
-            _telegram?.Dispose();*/
-            base.OnDestroy();
         }
     }
 }
