@@ -9967,25 +9967,25 @@ namespace SmsForwarder
 			public const int action_divider = 2131230780;
 			
 			// aapt resource value: 0x7F08003D
-			public const int action_image = 2131230781;
+			public const int action_exit = 2131230781;
 			
 			// aapt resource value: 0x7F08003E
-			public const int action_menu_divider = 2131230782;
+			public const int action_image = 2131230782;
 			
 			// aapt resource value: 0x7F08003F
-			public const int action_menu_presenter = 2131230783;
+			public const int action_menu_divider = 2131230783;
 			
 			// aapt resource value: 0x7F080040
-			public const int action_mode_bar = 2131230784;
+			public const int action_menu_presenter = 2131230784;
 			
 			// aapt resource value: 0x7F080041
-			public const int action_mode_bar_stub = 2131230785;
+			public const int action_mode_bar = 2131230785;
 			
 			// aapt resource value: 0x7F080042
-			public const int action_mode_close_button = 2131230786;
+			public const int action_mode_bar_stub = 2131230786;
 			
 			// aapt resource value: 0x7F080043
-			public const int action_settings = 2131230787;
+			public const int action_mode_close_button = 2131230787;
 			
 			// aapt resource value: 0x7F080044
 			public const int action_text = 2131230788;
@@ -12191,7 +12191,7 @@ namespace SmsForwarder
 			public const int abc_toolbar_collapse_description = 2131755034;
 			
 			// aapt resource value: 0x7F10001B
-			public const int action_settings = 2131755035;
+			public const int action_exit = 2131755035;
 			
 			// aapt resource value: 0x7F10001C
 			public const int androidx_startup = 2131755036;

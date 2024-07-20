@@ -239,8 +239,17 @@ namespace SmsForwarder
         public override bool OnOptionsItemSelected(IMenuItem item)
         {
             var id = item.ItemId;
-            if (id == Resource.Id.action_settings)
+            if (id == Resource.Id.action_exit)
             {
+                SmsQueue.Clear();
+                StopService(_intent);
+                _cts?.Cancel();
+                _cts?.Dispose();
+                _telegram?.Dispose();
+
+                this.FinishAndRemoveTask();
+                Android.OS.Process.KillProcess(Android.OS.Process.MyPid());
+
                 return true;
             }
 
@@ -347,11 +356,11 @@ namespace SmsForwarder
 
         protected override void OnDestroy()
         {
-            SmsQueue.Clear();
+            /*SmsQueue.Clear();
             StopService(_intent);
             _cts?.Cancel();
             _cts?.Dispose();
-            _telegram?.Dispose();
+            _telegram?.Dispose();*/
             base.OnDestroy();
         }
     }
