@@ -81,7 +81,7 @@
     <Compile Include="QueuedSms.cs" />
     <Compile Include="Resources\Resource.designer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="PushBroadcastReceiver.cs" />
+    <Compile Include="NotificationForwardService.cs" />
     <Compile Include="ServiceExtension.cs" />
     <Compile Include="BootBroadcastReceiver.cs" />
     <Compile Include="SMSBroadcastReceiver.cs" />

@@ -1,17 +1,14 @@
-﻿using System;
-
-using Android.App;
+﻿using Android.App;
 using Android.Content;
 using Android.OS;
-using Android.Provider;
 using Android.Service.Notification;
 using Android.Util;
 
-/*namespace SmsForwarder
+namespace SmsForwarder
 {
-    [Service(Label = "ServiceName", Permission = "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE")]
+    [Service(Exported = true, Label = "NotificationForwardService", Permission = "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE")]
     [IntentFilter(new[] { "android.service.notification.NotificationListenerService" })]
-    public class NLService : NotificationListenerService
+    public class NotificationForwardService : NotificationListenerService
     {
         public override void OnCreate()
         {
@@ -30,21 +27,20 @@ using Android.Util;
         {
             return base.OnUnbind(intent);
         }
-        public override void OnNotificationPosted(StatusBarNotification sbn)
+        public override void OnNotificationPosted(StatusBarNotification? sbn)
         {
-            var notification = sbn.Notification;
-            Bundle extras = notification.Extras;
+            var notification = sbn?.Notification;
+            Bundle extras = notification?.Extras;
             if (extras != null)
             {
-                // Get the title from notification  
-                string title = extras.GetString(Notification.ExtraText, "");
+                // Get the title from notification
+                string title = extras.GetString(Notification.ExtraTitle, "") ?? "";
+                MainActivity.ShowToast("============" + title + "======================");
 
-                // Get the content from notification  
-                string content = extras.GetString(Notification.ExtraText, "");
-                Console.WriteLine("============" + content + "======================");
+                // Get the content from notification
+                string content = extras.GetString(Notification.ExtraText, "") ?? "";
+                MainActivity.ShowToast("============" + content + "======================");
             }
-
-
 
             base.OnNotificationPosted(sbn);
         }
@@ -54,4 +50,4 @@ using Android.Util;
             base.OnNotificationRemoved(sbn);
         }
     }
-}*/
+}

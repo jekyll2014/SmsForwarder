@@ -2,6 +2,7 @@
 using Android.Content;
 using Android.OS;
 using Android.Runtime;
+using Android.Telephony;
 using Android.Views;
 using Android.Widget;
 
@@ -30,6 +31,9 @@ using Toolbar = AndroidX.AppCompat.Widget.Toolbar;
 [assembly: UsesPermission(Android.Manifest.Permission.ReceiveSms)]
 [assembly: UsesPermission(Android.Manifest.Permission.RequestIgnoreBatteryOptimizations)]
 [assembly: UsesPermission(Android.Manifest.Permission.SendSms)]
+
+[assembly: UsesPermission(Android.Manifest.Permission.AccessNotificationPolicy)]
+[assembly: UsesPermission(Android.Manifest.Permission.BindNotificationListenerService)]
 namespace SmsForwarder
 {
     [Activity(Label = "@string/app_name", Theme = "@style/AppTheme.NoActionBar", MainLauncher = true)]
@@ -38,6 +42,7 @@ namespace SmsForwarder
         private const int SmsExpiryHours = 24;
         private static MainActivity? _instance;
         private Intent? _intent;
+        //private Intent? _intent2;
         private CancellationTokenSource _cts = new CancellationTokenSource();
         private static TelegramService? _telegram;
         private static readonly ConcurrentQueue<QueuedSms> SmsQueue = new ConcurrentQueue<QueuedSms>();
@@ -84,7 +89,24 @@ namespace SmsForwarder
                 AppSettings.RestartOnBoot = false;
             }
 
-            _telegram = new TelegramService(AppSettings.TelegramToken, AppSettings.AuthorisedUsers);
+            SmsManager smsManager = null;
+            try
+            {
+                if (Android.OS.Build.VERSION.SdkInt >= BuildVersionCodes.S)
+                {
+                    smsManager = (SmsManager)GetSystemService(Java.Lang.Class.FromType(typeof(SmsManager)));
+                }
+                else
+                {
+                    smsManager = SmsManager.Default;
+                }
+            }
+            catch (Exception ex)
+            {
+                MainActivity.ShowToast($"Can't get SmsManager: {ex}");
+            }
+
+            _telegram = new TelegramService(AppSettings.TelegramToken, AppSettings.AuthorisedUsers, smsManager);
 
             var toolbar = FindViewById<Toolbar>(Resource.Id.toolbar);
             SetSupportActionBar(toolbar);
@@ -196,6 +218,11 @@ namespace SmsForwarder
             _intent = new Intent(this, typeof(SmsForwardingService));
             this.StartForegroundServiceCompat<SmsForwardingService>();
 
+            /*Intent intent = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
+            StartActivity(intent);*/
+            //_intent2 = new Intent(this, typeof(NotificationForwardService));
+            //this.StartForegroundServiceCompat<NotificationForwardService>();
+
             /*var pushIntent = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
             StartActivity(pushIntent);*/
         }
@@ -219,8 +246,8 @@ namespace SmsForwarder
             {
                 try
                 {
-                    AppSettings.RestartOnBoot = false;
                     UnregisterReceiver(_bootReceiver);
+                    AppSettings.RestartOnBoot = false;
                 }
                 catch (Exception ex)
                 {
@@ -246,6 +273,7 @@ namespace SmsForwarder
             {
                 SmsQueue.Clear();
                 StopService(_intent);
+                //StopService(_intent2);
                 _cts?.Cancel();
                 _cts?.Dispose();
                 _telegram?.Dispose();
@@ -325,7 +353,8 @@ namespace SmsForwarder
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine(ex);
+                        ShowToast($"Telegram exception: {ex}\r\n\r\n");
+
                         throw;
                     }
                 }
@@ -340,7 +369,7 @@ namespace SmsForwarder
             {
                 _instance?.RunOnUiThread(() =>
                 {
-                    Toast.MakeText(Android.App.Application.Context, text, ToastLength.Long)?.Show();
+                    Toast.MakeText(Android.App.Application.Context, text, ToastLength.Short)?.Show();
                 });
 
             }

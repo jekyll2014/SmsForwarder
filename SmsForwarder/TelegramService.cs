@@ -44,7 +44,9 @@ namespace SmsForwarder
 
         private bool _disposedValue;
 
-        public TelegramService(string token, long[] authorisedUsers)
+        private SmsManager? _smsManager;
+
+        public TelegramService(string token, long[] authorisedUsers, SmsManager? smsManager)
         {
             _token = token;
             AuthorisedUsers = authorisedUsers;
@@ -54,6 +56,8 @@ namespace SmsForwarder
                 MainActivity.ShowToast($"Starting Telegram service...");
                 Connect();
             }
+
+            _smsManager = smsManager;
         }
 
         private async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken token)
@@ -186,7 +190,7 @@ namespace SmsForwarder
                 _ => exception.ToString()
             };
 
-            Console.WriteLine(errorMessage);
+            MainActivity.ShowToast(errorMessage);
         }
 
         public async Task<bool> Connect()
@@ -306,7 +310,7 @@ namespace SmsForwarder
             if (_botClient == null)
                 return null;
 
-            //Console.WriteLine($"Sending text to [{chatId}]: \"{text}\"");
+            MainActivity.ShowToast($"Sending text to [{chatId}]: \"{text}\"");
 
             try
             {
@@ -322,7 +326,7 @@ namespace SmsForwarder
 
         private static GsmInfo GetCellphoneProvider()
         {
-            var manager = Android.App.Application.Context.GetSystemService(Context.TelephonyService) as Android.Telephony.TelephonyManager;
+            var manager = Android.App.Application.Context.GetSystemService(Android.Content.Context.TelephonyService) as Android.Telephony.TelephonyManager;
 
             return new GsmInfo()
             {
@@ -349,7 +353,7 @@ namespace SmsForwarder
             }
             catch (Exception ex)
             {
-                //Console.WriteLine("Unable to gather battery level, ensure you have android.permission.BATTERY_STATS set in AndroidManifest.");
+                MainActivity.ShowToast("Unable to gather battery level, ensure you have android.permission.BATTERY_STATS set in AndroidManifest.");
             }
 
             return -1;
@@ -444,25 +448,20 @@ namespace SmsForwarder
             return items;
         }
 
-        public static bool SendSms(string address, string text)
+        public bool SendSms(string address, string text)
         {
             if (string.IsNullOrEmpty(address) || string.IsNullOrEmpty(text))
                 return false;
 
             try
             {
-                /*if (Android.OS.Build.VERSION.SdkInt >= BuildVersionCodes.M) {
-                    var smsManager = Context.getSystemService(SmsManager::class.java)
-                } else {
-                    SmsManager.getDefault()
-                }*/
-                SmsManager.Default?.SendTextMessage(address, null,
-                    text, null, null);
-
+                _smsManager?.SendTextMessage(address, null, text, null, null);
                 MainActivity.ShowToast($"SMS sent");
             }
             catch (Exception ex)
             {
+                MainActivity.ShowToast($"Exception sending SMS: {ex}");
+
                 return false;
             }
 

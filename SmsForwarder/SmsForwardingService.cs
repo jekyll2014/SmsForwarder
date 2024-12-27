@@ -82,6 +82,5 @@ namespace SmsForwarder
 
             return notifBuilder.Build();
         }
-
     }
 }
