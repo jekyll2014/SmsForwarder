@@ -2,7 +2,8 @@
 using Android.Content;
 using Android.OS;
 using Android.Service.Notification;
-using Android.Util;
+
+using AndroidX.Core.App;
 
 namespace SmsForwarder
 {
@@ -10,13 +11,19 @@ namespace SmsForwarder
     [IntentFilter(new[] { "android.service.notification.NotificationListenerService" })]
     public class NotificationForwardService : NotificationListenerService
     {
+        private const string ForegroundChannelId = "1004";
+        private const int ServiceId = 200;
+        private static readonly Context Context = Application.Context;
+
         public override void OnCreate()
         {
             base.OnCreate();
-            Log.Info("start running", "Servico Criado");
+            var notification = BuildNotification(Resources?.GetString(Resource.String.app_name) ?? "", "Notification forward started");
+            StartForeground(ServiceId, notification);
         }
         public override void OnDestroy()
         {
+            StopTheService();
             base.OnDestroy();
         }
         public override IBinder OnBind(Intent intent)
@@ -27,6 +34,7 @@ namespace SmsForwarder
         {
             return base.OnUnbind(intent);
         }
+
         public override void OnNotificationPosted(StatusBarNotification? sbn)
         {
             var notification = sbn?.Notification;
@@ -48,6 +56,51 @@ namespace SmsForwarder
         public override void OnNotificationRemoved(StatusBarNotification sbn)
         {
             base.OnNotificationRemoved(sbn);
+        }
+
+        private void StopTheService()
+        {
+            StopForeground(StopForegroundFlags.Detach);
+            StopSelf();
+        }
+
+        private static Notification BuildNotification(string appName, string notificationText)
+        {
+            // Building intent
+            var intent = new Intent(Context, typeof(MainActivity));
+            intent.AddFlags(ActivityFlags.SingleTop);
+            intent.PutExtra(appName, notificationText);
+
+            var pendingIntent = PendingIntent.GetActivity(Context, 0, intent, PendingIntentFlags.UpdateCurrent);
+
+            var notifBuilder = new NotificationCompat.Builder(Context, ForegroundChannelId)
+                .SetContentTitle(appName)
+                .SetContentText(notificationText)
+                .SetSmallIcon(Resource.Drawable.ic_mtrl_chip_checked_circle)
+                .SetOngoing(true)
+                .SetContentIntent(pendingIntent);
+
+            // Building channel if API verion is 26 or above
+            if (Android.OS.Build.VERSION.SdkInt >= BuildVersionCodes.O)
+            {
+                var notificationChannel = new NotificationChannel(ForegroundChannelId, appName, NotificationImportance.High)
+                {
+                    Importance = NotificationImportance.Default
+                };
+
+                notificationChannel.EnableLights(true);
+                notificationChannel.EnableVibration(true);
+                notificationChannel.SetShowBadge(true);
+                //notificationChannel.SetVibrationPattern(new long[] { 100, 200, 300, 400, 500, 400, 300, 200, 400 });
+
+                if (Context.GetSystemService(Context.NotificationService) is NotificationManager notifManager)
+                {
+                    notifBuilder.SetChannelId(ForegroundChannelId);
+                    notifManager.CreateNotificationChannel(notificationChannel);
+                }
+            }
+
+            return notifBuilder.Build();
         }
     }
 }

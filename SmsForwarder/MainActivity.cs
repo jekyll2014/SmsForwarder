@@ -1,8 +1,27 @@
-﻿using Android.App;
+﻿/*
+<application android:allowBackup="true"
+               android:icon="@mipmap/ic_launcher"
+               android:label="@string/app_name"
+               android:supportsRtl="true" 
+               android:theme="@style/AppTheme">
+    <!-- <receiver android:name=".BootBroadcastReceiver" android:enabled="true" android:exported="true">
+      <intent-filter>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <action android:name="android.intent.action.BOOT_COMPLETED"/>
+        <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+        <!--For HTC devices-->
+        <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+      </intent-filter>
+    </receiver> -->
+  </application>
+*/
+
+using Android.App;
 using Android.Content;
 using Android.OS;
 using Android.Runtime;
 using Android.Telephony;
+using Android.Util;
 using Android.Views;
 using Android.Widget;
 
@@ -31,7 +50,6 @@ using Toolbar = AndroidX.AppCompat.Widget.Toolbar;
 [assembly: UsesPermission(Android.Manifest.Permission.ReceiveSms)]
 [assembly: UsesPermission(Android.Manifest.Permission.RequestIgnoreBatteryOptimizations)]
 [assembly: UsesPermission(Android.Manifest.Permission.SendSms)]
-
 [assembly: UsesPermission(Android.Manifest.Permission.AccessNotificationPolicy)]
 [assembly: UsesPermission(Android.Manifest.Permission.BindNotificationListenerService)]
 namespace SmsForwarder
@@ -103,10 +121,11 @@ namespace SmsForwarder
             }
             catch (Exception ex)
             {
-                MainActivity.ShowToast($"Can't get SmsManager: {ex}");
+                MainActivity.ShowToast($"Can't get SmsManager");
             }
 
-            _telegram = new TelegramService(AppSettings.TelegramToken, AppSettings.AuthorisedUsers, smsManager);
+            if (_telegram == null)
+                _telegram = new TelegramService(AppSettings.TelegramToken, AppSettings.AuthorisedUsers, smsManager);
 
             var toolbar = FindViewById<Toolbar>(Resource.Id.toolbar);
             SetSupportActionBar(toolbar);
@@ -175,6 +194,8 @@ namespace SmsForwarder
                 Android.Manifest.Permission.ReadCallLog,
                 Android.Manifest.Permission.RequestIgnoreBatteryOptimizations,
                 Android.Manifest.Permission.SendSms,
+                //Android.Manifest.Permission.AccessNotificationPolicy,
+                //Android.Manifest.Permission.BindNotificationListenerService
             }, 0);
 
             _smsPermissionCheckBox = FindViewById<CheckBox>(Resource.Id.checkBoxSmsPermission);
@@ -218,13 +239,8 @@ namespace SmsForwarder
             _intent = new Intent(this, typeof(SmsForwardingService));
             this.StartForegroundServiceCompat<SmsForwardingService>();
 
-            /*Intent intent = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
-            StartActivity(intent);*/
-            //_intent2 = new Intent(this, typeof(NotificationForwardService));
-            //this.StartForegroundServiceCompat<NotificationForwardService>();
-
-            /*var pushIntent = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
-            StartActivity(pushIntent);*/
+            /*_intent2 = new Intent(this, typeof(NotificationForwardService));
+            this.StartForegroundServiceCompat<NotificationForwardService>();*/
         }
 
         private void RestartOnBootCheckBox_CheckedChange(object sender, CompoundButton.CheckedChangeEventArgs e)
@@ -343,9 +359,9 @@ namespace SmsForwarder
                     try
                     {
                         var messageContent = $"SMS from [{sms.Content.Sender}]: {sms.Content.Message}";
-                        var sendTask = _telegram?.SendText(sms.UserId, messageContent,
+                        var sendTask = await _telegram?.SendText(sms.UserId, messageContent,
                             _cts?.Token ?? CancellationToken.None);
-                        if (sendTask?.Result == null)
+                        if (sendTask == null)
                         {
                             if (DateTime.Now.Subtract(sms.CreatedOn).TotalHours < SmsExpiryHours)
                                 SmsQueue.Enqueue(sms);
@@ -353,7 +369,7 @@ namespace SmsForwarder
                     }
                     catch (Exception ex)
                     {
-                        ShowToast($"Telegram exception: {ex}\r\n\r\n");
+                        ShowToast($"Telegram exception: {ex.Message}\r\n\r\n");
 
                         throw;
                     }
@@ -369,12 +385,13 @@ namespace SmsForwarder
             {
                 _instance?.RunOnUiThread(() =>
                 {
-                    Toast.MakeText(Android.App.Application.Context, text, ToastLength.Short)?.Show();
+                    Toast.MakeText(Android.App.Application.Context, text, ToastLength.Long)?.Show();
                 });
 
             }
             catch (Exception ex)
             {
+                Log.Error("Toast exception", $"Toast error: {ex}");
             }
         }
     }

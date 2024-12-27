@@ -173,7 +173,7 @@ namespace SmsForwarder
                 }
                 catch (Exception ex)
                 {
-                    MainActivity.ShowToast($"Exception durind processing command \"{messageText}\" from \"@{senderName}\"[{senderId}]: {ex}");
+                    MainActivity.ShowToast($"Exception processing command \"{messageText}\" from \"@{senderName}\"[{senderId}]: {ex}");
                 }
             });
         }
@@ -213,7 +213,7 @@ namespace SmsForwarder
 
             try
             {
-                if (!_botClient.TestApiAsync().Result)
+                if (!(await _botClient.TestApi()))
                 {
                     MainActivity.ShowToast($"Telegram connection failed");
                     _botClient = null;
@@ -221,7 +221,7 @@ namespace SmsForwarder
                     return false;
                 }
 
-                _botClient.SetMyCommandsAsync(new[]
+                await _botClient.SetMyCommands(new[]
                 {
                     new BotCommand()
                     {
@@ -243,15 +243,15 @@ namespace SmsForwarder
                         Command = CallListCommand.TrimStart('/'),
                         Description = CallListommandDescription
                     }
-                }).Wait();
+                });
 
                 _botClient.StartReceiving(
                     updateHandler: HandleUpdateAsync,
-                    pollingErrorHandler: HandlePollingErrorAsync,
+                    HandlePollingErrorAsync,
                     receiverOptions: receiverOptions,
                     cancellationToken: _cts.Token);
 
-                var me = _botClient.GetMeAsync().Result;
+                var me = await _botClient.GetMe();
                 MainActivity.ShowToast($"...listening for @{me.Username} [{me.Id}]");
                 await SendText(AuthorisedUsers,
                     $"...listening for @{me.Username} [{me.Id}]",
@@ -259,11 +259,11 @@ namespace SmsForwarder
             }
             catch (Exception ex)
             {
-                MainActivity.ShowToast($"...connection failed: {ex}");
+                var message = $"...connection failed: {ex}\r\n";
                 if (ex is ApiRequestException apiEx && apiEx.ErrorCode == 401)
-                    MainActivity.ShowToast($"Check your telegram token: {_token}");
-                else
-                    MainActivity.ShowToast($"Exception: {ex}");
+                    message += $"Check your telegram token: {_token}";
+
+                MainActivity.ShowToast(message);
 
                 return false;
             }
@@ -273,22 +273,27 @@ namespace SmsForwarder
 
         public void Disconnect()
         {
-            _botClient?.CloseAsync();
+            _botClient?.Close();
             _botClient = null;
             _cts?.Cancel();
             _cts?.Dispose();
         }
 
-        public void SetToken(string value)
+        public async Task<bool> SetToken(string value)
         {
             if (value == _token)
-                return;
+                return true;
+
+            if (string.IsNullOrEmpty(value))
+                return false;
 
             _token = value;
             Disconnect();
 
             if (!string.IsNullOrEmpty(_token))
-                Connect();
+                return await Connect();
+
+            return false;
         }
 
         public async Task<bool> SendText(IEnumerable<long> userIds, string text, CancellationToken cancellationToken)
@@ -314,11 +319,11 @@ namespace SmsForwarder
 
             try
             {
-                return await _botClient.SendTextMessageAsync(chatId, text, cancellationToken: cancellationToken);
+                return await _botClient.SendMessage(chatId, text, cancellationToken: cancellationToken);
             }
             catch (Exception ex)
             {
-                MainActivity.ShowToast($"Telegram exception: {ex}");
+                MainActivity.ShowToast($"Telegram send message exception: {ex.Message}");
 
                 return null;
             }
@@ -353,7 +358,7 @@ namespace SmsForwarder
             }
             catch (Exception ex)
             {
-                MainActivity.ShowToast("Unable to gather battery level, ensure you have android.permission.BATTERY_STATS set in AndroidManifest.");
+                MainActivity.ShowToast("Unable to get battery level, ensure you have android.permission.BATTERY_STATS set in AndroidManifest.");
             }
 
             return -1;
@@ -460,7 +465,7 @@ namespace SmsForwarder
             }
             catch (Exception ex)
             {
-                MainActivity.ShowToast($"Exception sending SMS: {ex}");
+                MainActivity.ShowToast($"Exception sending SMS: {ex.Message}");
 
                 return false;
             }
@@ -474,7 +479,7 @@ namespace SmsForwarder
             {
                 if (disposing)
                 {
-                    _botClient?.CloseAsync();
+                    _botClient?.Close();
                     _cts?.Cancel();
                     _cts?.Dispose();
                 }
